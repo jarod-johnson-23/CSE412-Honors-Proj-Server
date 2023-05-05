@@ -21,11 +21,12 @@ app.listen(3010, () => {
   console.log("database running on port 3010");
 });
 
-app.get("/get-player-data", (req, res) => {
+app.post("/get-player-data", (req, res) => {
   const name = req.body.name;
-
   const sqlSelect =
-    "SELECT * FROM NPE_data WHERE name = '" + name + "' ORDER BY year, week";
+    'SELECT * FROM NPE_data WHERE name = "' +
+    name +
+    '" ORDER BY year DESC, week DESC';
 
   player_db.query(sqlSelect, (err, result) => {
     if (err) {
@@ -235,6 +236,74 @@ app.get("/def-least-PPG", (req, res) => {
 app.get("/def-most-PPG", (req, res) => {
   const sqlSelect =
     "SELECT fullName, year, pointsAllowedPG FROM NPE_defenses ORDER BY pointsAllowedPG DESC LIMIT 5";
+
+  player_db.query(sqlSelect, (err, result) => {
+    if (err) {
+      console.log(err);
+    } else {
+      res.send(result);
+    }
+  });
+});
+
+app.post("/custom-query", (req, res) => {
+  let sqlStatement = req.body.sql;
+  let finalStatement = sqlStatement
+    .replace(/Players/g, "NPE_data")
+    .replace(/Defenses/g, "NPE_defenses")
+    .replace(/;/g, " ");
+
+  let lowerCased = sqlStatement.toLowerCase();
+
+  finalStatement += " LIMIT 100";
+
+  if (
+    lowerCased.indexOf("delete") > -1 ||
+    lowerCased.indexOf("update") > -1 ||
+    lowerCased.indexOf("drop") > -1 ||
+    lowerCased.indexOf("insert") > -1
+  ) {
+    res.sendStatus(500);
+  } else {
+    player_db.query(finalStatement, (err, result) => {
+      if (err) {
+        console.log(err);
+      } else {
+        res.send(result);
+      }
+    });
+  }
+});
+
+app.get("/get-complete-stats", (req, res) => {
+  let sqlSelect =
+    "SELECT * FROM NPE_data, NPE_Defenses WHERE NPE_data.year = NPE_defenses.year AND NPE_data.opp = NPE_defenses.tag AND NPE_data.start = 1  ORDER BY rushingAttempts DESC, rushingYards DESC LIMIT 5";
+
+  player_db.query(sqlSelect, (err, result) => {
+    if (err) {
+      console.log(err);
+    } else {
+      res.send(result);
+    }
+  });
+});
+
+app.get("/avg-stats-query", (req, res) => {
+  let sqlSelect =
+    "SELECT COUNT(*) AS numGames, name, AVG(fumblesLost) AS avgFumbles, SUM(fumblesLost) AS sumFumbles, SUM(fantasyDataPPR) AS totalFantasyPoints FROM NPE_data GROUP BY name ORDER BY avgFumbles DESC LIMIT 5";
+
+  player_db.query(sqlSelect, (err, result) => {
+    if (err) {
+      console.log(err);
+    } else {
+      res.send(result);
+    }
+  });
+});
+
+app.get("/non-start-query", (req, res) => {
+  let sqlSelect =
+    "SELECT name, SUM(passingYards + rushingYards + receivingYards) AS totalYards, COUNT(*) AS numGames, MIN(year) AS startYear, MAX(year) AS endYear FROM NPE_data WHERE start != 1 AND year >= 2000 GROUP BY name ORDER BY totalYards DESC LIMIT 5";
 
   player_db.query(sqlSelect, (err, result) => {
     if (err) {
